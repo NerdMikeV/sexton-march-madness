@@ -11,6 +11,37 @@ type EntryWithDetails = LeaderboardEntry & {
   picks?: (EntryPick & { team: Team; points: number; isUpset: boolean })[]
 }
 
+type RemainingTeam = { name: string; seed: number }
+
+function RemainingTeamsLine({ remaining, upsetCount }: { remaining: RemainingTeam[] | null; upsetCount: number }) {
+  if (remaining === null) {
+    // Still loading — show wins placeholder so layout doesn't jump
+    return <div className="text-white/20 text-xs">Loading…</div>
+  }
+  const count = remaining.length
+  return (
+    <div className="text-xs mt-0.5 flex flex-wrap items-center gap-x-2">
+      {count === 0 ? (
+        <span className="text-red-400">0 teams remaining</span>
+      ) : (
+        <span className="text-white/40">
+          <span className="text-white/60 font-medium">{count}</span>
+          {' '}team{count !== 1 ? 's' : ''} remaining:{' '}
+          {remaining.map((t, i) => (
+            <span key={t.seed}>
+              {i > 0 && ', '}
+              <span className="text-white/55">({t.seed})</span> {t.name}
+            </span>
+          ))}
+        </span>
+      )}
+      {upsetCount > 0 && (
+        <span className="text-purple-400">⚡ {upsetCount} upset{upsetCount > 1 ? 's' : ''}</span>
+      )}
+    </div>
+  )
+}
+
 const RANK_STYLES: Record<number, { badge: string; row: string }> = {
   1: { badge: 'bg-amber-500 text-black', row: 'bg-amber-500/5 border-amber-500/20' },
   2: { badge: 'bg-slate-300 text-black', row: 'bg-slate-500/5 border-slate-500/20' },
@@ -24,13 +55,38 @@ export default function LeaderboardPage() {
   const [expandedData, setExpandedData] = useState<Record<string, EntryWithDetails['picks']>>({})
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null)
   const [entryCount, setEntryCount] = useState(0)
+  const [remainingByEntry, setRemainingByEntry] = useState<Record<string, RemainingTeam[]>>({})
 
   const fetchLeaderboard = useCallback(async () => {
     const res = await fetch('/api/leaderboard')
     if (res.ok) {
-      const data = await res.json()
+      const data: LeaderboardEntry[] = await res.json()
       setEntries(data)
       setLastUpdated(new Date())
+
+      // Batch-fetch all picks with team elimination status
+      if (data.length > 0) {
+        const supabase = createClient()
+        const { data: allPicks } = await supabase
+          .from('entry_picks')
+          .select('entry_id, team:teams(name, seed, is_eliminated)')
+          .in('entry_id', data.map(e => e.entry_id))
+
+        if (allPicks) {
+          const map: Record<string, RemainingTeam[]> = {}
+          for (const pick of allPicks) {
+            const team = Array.isArray(pick.team) ? pick.team[0] : pick.team
+            if (!team || team.is_eliminated) continue
+            if (!map[pick.entry_id]) map[pick.entry_id] = []
+            map[pick.entry_id].push({ name: team.name, seed: team.seed })
+          }
+          // Sort each entry's remaining teams by seed
+          for (const id of Object.keys(map)) {
+            map[id].sort((a, b) => a.seed - b.seed)
+          }
+          setRemainingByEntry(map)
+        }
+      }
     }
   }, [])
 
@@ -52,6 +108,9 @@ export default function LeaderboardPage() {
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'entries' }, () => {
         fetchEntryCount()
+      })
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'teams' }, () => {
+        fetchLeaderboard()
       })
       .subscribe()
 
@@ -186,12 +245,10 @@ export default function LeaderboardPage() {
                       {/* Name */}
                       <div className="flex-1 min-w-0">
                         <div className="font-semibold text-white truncate">{entry.participant_name}</div>
-                        <div className="text-white/40 text-xs">
-                          {entry.total_wins} {entry.total_wins === 1 ? 'win' : 'wins'}
-                          {entry.upset_count > 0 && (
-                            <span className="text-purple-400 ml-2">⚡ {entry.upset_count} upset{entry.upset_count > 1 ? 's' : ''}</span>
-                          )}
-                        </div>
+                        <RemainingTeamsLine
+                          remaining={remainingByEntry[entry.entry_id] ?? null}
+                          upsetCount={entry.upset_count}
+                        />
                       </div>
 
                       {/* Points */}
