@@ -61,7 +61,7 @@ function Countdown({ deadline }: { deadline: Date }) {
 export default function HomePage() {
   const [entryCount, setEntryCount] = useState(0)
   const [loading, setLoading] = useState(true)
-  const deadline = new Date('2025-03-20T23:59:59Z')
+  const [deadline, setDeadline] = useState<Date | null>(null)
 
   useEffect(() => {
     const supabase = createClient()
@@ -69,6 +69,19 @@ export default function HomePage() {
       setEntryCount(count || 0)
       setLoading(false)
     })
+    supabase
+      .from('settings')
+      .select('value')
+      .eq('key', 'entry_deadline')
+      .single()
+      .then(({ data }) => {
+        if (data?.value) {
+          const raw = typeof data.value === 'string'
+            ? data.value.replace(/^"|"$/g, '')
+            : String(data.value)
+          setDeadline(new Date(raw))
+        }
+      })
   }, [])
 
   const prizes = getPrizeDistribution(entryCount)
@@ -118,11 +131,15 @@ export default function HomePage() {
           </div>
 
           {/* Deadline countdown */}
-          <div className="mb-6">
-            <p className="text-white/50 text-sm mb-4 tracking-widest uppercase">Entry Deadline</p>
-            <Countdown deadline={deadline} />
-            <p className="text-white/30 text-xs mt-3">March 20, 2025 at 11:59 PM</p>
-          </div>
+          {deadline && (
+            <div className="mb-6">
+              <p className="text-white/50 text-sm mb-4 tracking-widest uppercase">Entry Deadline</p>
+              <Countdown deadline={deadline} />
+              <p className="text-white/30 text-xs mt-3">
+                {deadline.toLocaleString('en-US', { month: 'long', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' })}
+              </p>
+            </div>
+          )}
         </div>
       </section>
 

@@ -8,7 +8,6 @@ import type { Team } from '@/lib/types'
 
 const REGIONS = ['South', 'East', 'Midwest', 'West']
 const ALL_SEEDS = Array.from({ length: 16 }, (_, i) => i + 1)
-const DEADLINE = new Date('2025-03-20T23:59:59Z')
 const BYPASS_DEADLINE = process.env.NEXT_PUBLIC_BYPASS_DEADLINE === 'true'
 
 function SeedBadge({ seed }: { seed: number }) {
@@ -22,6 +21,8 @@ function SeedBadge({ seed }: { seed: number }) {
 export default function EnterPage() {
   const [teams, setTeams] = useState<Team[]>([])
   const [loading, setLoading] = useState(true)
+  const [deadline, setDeadline] = useState<Date | null>(null)
+  const [deadlineLoading, setDeadlineLoading] = useState(true)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
@@ -32,7 +33,7 @@ export default function EnterPage() {
   const [entryId, setEntryId] = useState('')
   const [error, setError] = useState('')
 
-  const isPastDeadline = !BYPASS_DEADLINE && new Date() > DEADLINE
+  const isPastDeadline = !BYPASS_DEADLINE && deadline !== null && new Date() > deadline
 
   useEffect(() => {
     const supabase = createClient()
@@ -43,6 +44,20 @@ export default function EnterPage() {
       .then(({ data }) => {
         setTeams(data || [])
         setLoading(false)
+      })
+    supabase
+      .from('settings')
+      .select('value')
+      .eq('key', 'entry_deadline')
+      .single()
+      .then(({ data }) => {
+        if (data?.value) {
+          const raw = typeof data.value === 'string'
+            ? data.value.replace(/^"|"$/g, '')
+            : String(data.value)
+          setDeadline(new Date(raw))
+        }
+        setDeadlineLoading(false)
       })
   }, [])
 
@@ -126,12 +141,23 @@ export default function EnterPage() {
     }
   }
 
+  if (deadlineLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center px-4">
+        <div className="h-10 w-48 bg-white/5 rounded animate-pulse" />
+      </div>
+    )
+  }
+
   if (isPastDeadline) {
+    const deadlineStr = deadline
+      ? deadline.toLocaleString('en-US', { month: 'long', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' })
+      : 'the deadline'
     return (
       <div className="min-h-screen flex items-center justify-center px-4">
         <div className="text-center">
           <div className="font-bebas text-6xl text-red-400 mb-4">ENTRIES CLOSED</div>
-          <p className="text-white/60 mb-8">The entry deadline was March 20, 2025 at 11:59 PM.</p>
+          <p className="text-white/60 mb-8">The entry deadline was {deadlineStr}.</p>
           <a href="/leaderboard" className="bg-amber-500 text-black font-bold px-6 py-3 rounded-lg">
             VIEW LEADERBOARD
           </a>
