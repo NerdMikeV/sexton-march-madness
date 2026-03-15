@@ -24,7 +24,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Team picks required' }, { status: 400 })
   }
 
-  const supabase = createClient()
+  const supabase = await createClient()
 
   // Check deadline (skip if BYPASS_DEADLINE=true in env, for testing)
   if (process.env.BYPASS_DEADLINE !== 'true') {

@@ -98,7 +98,7 @@ const RESULTS_2025: [string, string, number][] = [
 ]
 
 export async function POST() {
-  const supabase = createClient()
+  const supabase = await createClient()
 
   // Verify admin auth
   const { data: { user } } = await supabase.auth.getUser()
