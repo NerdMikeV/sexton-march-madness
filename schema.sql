@@ -26,7 +26,7 @@ CREATE TABLE IF NOT EXISTS teams (
 CREATE TABLE IF NOT EXISTS entries (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   participant_name TEXT NOT NULL,
-  participant_email TEXT,
+  participant_email TEXT,  -- NOT UNIQUE: multiple entries per email are allowed ($25 each)
   paid BOOLEAN DEFAULT false,
   submitted_at TIMESTAMPTZ DEFAULT now()
 );

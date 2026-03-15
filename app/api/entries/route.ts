@@ -71,7 +71,12 @@ export async function POST(req: NextRequest) {
     .select()
     .single()
 
-  if (entryError) return NextResponse.json({ error: entryError.message }, { status: 500 })
+  if (entryError) {
+    const msg = entryError.message.includes('unique') || entryError.code === '23505'
+      ? 'Something went wrong saving your entry. Please try again.'
+      : entryError.message
+    return NextResponse.json({ error: msg }, { status: 500 })
+  }
 
   // Insert picks
   const { error: picksError } = await supabase
