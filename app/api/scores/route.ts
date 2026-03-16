@@ -72,9 +72,9 @@ function matchesAnyTeam(oddsName: string, dbNames: string[]): boolean {
 }
 
 function isTournamentGame(game: OddsGame, dbNames: string[]): boolean {
+  if (dbNames.length === 0) return true
   return (
-    dbNames.length === 0 ||
-    matchesAnyTeam(game.home_team, dbNames) ||
+    matchesAnyTeam(game.home_team, dbNames) &&
     matchesAnyTeam(game.away_team, dbNames)
   )
 }
