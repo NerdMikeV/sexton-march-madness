@@ -40,6 +40,7 @@ export type LeaderboardEntry = {
   total_wins: number
   upset_count: number
   tiebreaker_total: number | null
+  submitted_at: string
 }
 
 export const ROUND_NAMES: Record<number, string> = {

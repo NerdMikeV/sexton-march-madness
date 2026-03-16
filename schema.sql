@@ -90,6 +90,7 @@ WITH entry_scores AS (
     e.participant_name,
     e.paid,
     e.tiebreaker_total,
+    e.submitted_at,
     ep.team_id,
     t.name as team_name,
     t.seed as team_seed,
@@ -118,13 +119,14 @@ SELECT
   participant_name,
   paid,
   tiebreaker_total,
+  submitted_at,
   SUM(
     CASE WHEN is_upset THEN base_points * 2 ELSE base_points END
   ) as total_points,
   COUNT(*) as total_wins,
   COUNT(*) FILTER (WHERE is_upset) as upset_count
 FROM entry_scores
-GROUP BY entry_id, participant_name, paid, tiebreaker_total
+GROUP BY entry_id, participant_name, paid, tiebreaker_total, submitted_at
 ORDER BY total_points DESC;
 
 -- ============================================================

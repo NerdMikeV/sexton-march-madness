@@ -6,6 +6,7 @@ import { createClient } from '@/lib/supabase/client'
 import { getSeedBadgeColor, getPrizeDistribution } from '@/lib/scoring'
 import type { Team, Entry, GameResult } from '@/lib/types'
 import { ROUND_NAMES } from '@/lib/types'
+import { buildDisplayNameMap } from '@/lib/utils'
 
 type EntryWithPicks = Entry & { picks: (Team & { pick_id: string })[] }
 
@@ -287,6 +288,7 @@ export default function AdminPage() {
 
   const paidCount = entries.filter(e => e.paid).length
   const prizes = getPrizeDistribution(entries.length)
+  const entryDisplayNames = buildDisplayNameMap(entries, e => e.id)
 
   return (
     <div className="min-h-screen">
@@ -584,7 +586,7 @@ export default function AdminPage() {
                       <div className="flex items-center gap-4 px-6 py-4">
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2">
-                            <span className="font-medium text-sm">{entry.participant_name}</span>
+                            <span className="font-medium text-sm">{entryDisplayNames.get(entry.id) ?? entry.participant_name}</span>
                             <span className={`text-xs px-2 py-0.5 rounded-full ${entry.paid ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}`}>
                               {entry.paid ? 'PAID' : 'UNPAID'}
                             </span>

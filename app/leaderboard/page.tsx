@@ -6,6 +6,7 @@ import { createClient } from '@/lib/supabase/client'
 import { getPrizeDistribution, getSeedBadgeColor } from '@/lib/scoring'
 import type { LeaderboardEntry, Team, EntryPick } from '@/lib/types'
 import { ROUND_NAMES } from '@/lib/types'
+import { disambiguateNames, buildDisplayNameMap } from '@/lib/utils'
 
 type EntryWithDetails = LeaderboardEntry & {
   picks?: (EntryPick & { team: Team; points: number; isUpset: boolean })[]
@@ -274,13 +275,13 @@ export default function LeaderboardPage() {
                   </div>
                 ) : (
                   <div className="space-y-2">
-                    {preRevealNames.map((e, idx) => (
+                    {disambiguateNames(preRevealNames).map((e, idx) => (
                       <div key={e.id} className="bg-white/3 border border-white/10 rounded-xl px-4 py-3.5 flex items-center gap-3">
                         <div className="w-8 h-8 rounded-full bg-white/8 flex items-center justify-center text-sm text-white/40 font-bold flex-shrink-0">
                           {idx + 1}
                         </div>
                         <div className="flex-1 min-w-0">
-                          <div className="font-semibold text-white truncate">{e.participant_name}</div>
+                          <div className="font-semibold text-white truncate">{e.display_name}</div>
                           <div className="text-white/30 text-xs mt-0.5">Picks hidden until tournament starts</div>
                         </div>
                       </div>
@@ -303,6 +304,8 @@ export default function LeaderboardPage() {
               </div>
             )
           }
+
+          const displayNames = buildDisplayNameMap(entries, e => e.entry_id)
 
           return (
             <div className="space-y-2">
@@ -333,7 +336,7 @@ export default function LeaderboardPage() {
 
                         {/* Name */}
                         <div className="flex-1 min-w-0">
-                          <div className="font-semibold text-white truncate">{entry.participant_name}</div>
+                          <div className="font-semibold text-white truncate">{displayNames.get(entry.entry_id) ?? entry.participant_name}</div>
                           <RemainingTeamsLine
                             remaining={remainingByEntry[entry.entry_id] ?? null}
                             upsetCount={entry.upset_count}

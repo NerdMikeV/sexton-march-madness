@@ -6,6 +6,7 @@ import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { getSeedBadgeColor } from '@/lib/scoring'
 import type { Team } from '@/lib/types'
+import { buildDisplayNameMap } from '@/lib/utils'
 
 interface EntryWithPicks {
   id: string
@@ -166,7 +167,9 @@ function MyEntriesContent() {
                 </h2>
               </div>
 
-              {entries.map((entry, idx) => (
+              {(() => {
+                const displayNames = buildDisplayNameMap(entries, e => e.id)
+                return entries.map((entry, idx) => (
                 <div
                   key={entry.id}
                   className="bg-white/3 border border-white/10 rounded-2xl overflow-hidden"
@@ -175,7 +178,7 @@ function MyEntriesContent() {
                   <div className="flex items-center justify-between px-5 py-4">
                     <div>
                       <div className="flex items-center gap-2 flex-wrap">
-                        <span className="font-semibold text-white">{entry.participant_name}</span>
+                        <span className="font-semibold text-white">{displayNames.get(entry.id) ?? entry.participant_name}</span>
                         <span className="text-white/30 text-xs">Entry #{idx + 1}</span>
                         <span
                           className={`text-xs px-2 py-0.5 rounded-full font-medium ${
@@ -243,7 +246,8 @@ function MyEntriesContent() {
                     </div>
                   )}
                 </div>
-              ))}
+              ))
+              })()}
 
               <div className="text-center pt-4">
                 <Link
