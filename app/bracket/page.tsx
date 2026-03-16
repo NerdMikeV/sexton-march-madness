@@ -339,10 +339,12 @@ function FinalFour({
   semi1,
   semi2,
   championship,
+  year,
 }: {
   semi1:        Slot
   semi2:        Slot
   championship: Slot
+  year:         string
 }) {
   const connMid = FF_CONN_W / 2
 
@@ -416,7 +418,7 @@ function FinalFour({
                   {championship.winner.name}
                 </div>
                 <div className="text-amber-500/70 text-[9px] uppercase tracking-widest mt-0.5">
-                  2025 Champion
+                  {year || '…'} Champion
                 </div>
               </div>
             </div>
@@ -442,15 +444,18 @@ function useBracket() {
   const [loading, setLoading] = useState(true)
   const [byRegionSeed, setByRegionSeed] = useState<Record<string, Record<number, Team>>>({})
   const [byRound, setByRound] = useState<Map<number, FullResult[]>>(new Map())
+  const [year, setYear] = useState<string>('')
 
   const load = useCallback(async () => {
-    const [{ data: teams }, { data: results }] = await Promise.all([
+    const [{ data: teams }, { data: results }, { data: yearSetting }] = await Promise.all([
       supabase.from('teams').select('*'),
       supabase
         .from('game_results')
         .select('*, winning_team:teams!game_results_winning_team_id_fkey(*), losing_team:teams!game_results_losing_team_id_fkey(*)')
         .order('round'),
+      supabase.from('settings').select('value').eq('key', 'contest_year').single(),
     ])
+    if (yearSetting?.value != null) setYear(String(yearSetting.value))
 
     const brs: Record<string, Record<number, Team>> = {}
     for (const t of (teams ?? []) as Team[]) {
@@ -480,7 +485,7 @@ function useBracket() {
     return () => { supabase.removeChannel(ch) }
   }, [supabase, load])
 
-  return { loading, byRegionSeed, byRound }
+  return { loading, byRegionSeed, byRound, year }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -490,14 +495,14 @@ type Tab = Region | 'Final Four'
 const TABS: Tab[] = [...REGIONS, 'Final Four']
 
 export default function BracketPage() {
-  const { loading, byRegionSeed, byRound } = useBracket()
+  const { loading, byRegionSeed, byRound, year } = useBracket()
   const [activeTab, setActiveTab] = useState<Tab>('South')
 
   if (loading) {
     return (
       <div className="max-w-6xl mx-auto px-4 py-8">
         <h1 className="font-bebas text-5xl tracking-widest leading-none mb-8">
-          2025 <span className="text-amber-400">BRACKET</span>
+          {year || '…'} <span className="text-amber-400">BRACKET</span>
         </h1>
         <div className="flex gap-4">
           {Array.from({ length: 4 }).map((_, i) => (
@@ -544,7 +549,7 @@ export default function BracketPage() {
       <div className="flex flex-wrap items-end justify-between gap-4 mb-5">
         <div>
           <h1 className="font-bebas text-5xl tracking-widest leading-none">
-            2025 <span className="text-amber-400">BRACKET</span>
+            {year || '…'} <span className="text-amber-400">BRACKET</span>
           </h1>
           <p className="text-white/35 text-sm mt-1">
             {totalResults} / 63 results entered · real-time updates
@@ -600,7 +605,7 @@ export default function BracketPage() {
         <div className="overflow-x-auto pb-6">
           {activeTab === 'Final Four' ? (
             <div className="flex justify-center min-w-max">
-              <FinalFour semi1={semi1} semi2={semi2} championship={championship} />
+              <FinalFour semi1={semi1} semi2={semi2} championship={championship} year={year} />
             </div>
           ) : (
             <div className="min-w-max">
@@ -628,7 +633,7 @@ export default function BracketPage() {
 
         {/* Final Four */}
         <div className="border-t border-white/10 pt-10 flex justify-center">
-          <FinalFour semi1={semi1} semi2={semi2} championship={championship} />
+          <FinalFour semi1={semi1} semi2={semi2} championship={championship} year={year} />
         </div>
       </div>
     </div>

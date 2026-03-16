@@ -62,6 +62,7 @@ export default function HomePage() {
   const [entryCount, setEntryCount] = useState(0)
   const [loading, setLoading] = useState(true)
   const [deadline, setDeadline] = useState<Date | null>(null)
+  const [year, setYear] = useState<string>('')
 
   useEffect(() => {
     const supabase = createClient()
@@ -69,11 +70,7 @@ export default function HomePage() {
       setEntryCount(count || 0)
       setLoading(false)
     })
-    supabase
-      .from('settings')
-      .select('value')
-      .eq('key', 'entry_deadline')
-      .single()
+    supabase.from('settings').select('value').eq('key', 'entry_deadline').single()
       .then(({ data }) => {
         if (data?.value) {
           const raw = typeof data.value === 'string'
@@ -82,6 +79,8 @@ export default function HomePage() {
           setDeadline(new Date(raw))
         }
       })
+    supabase.from('settings').select('value').eq('key', 'contest_year').single()
+      .then(({ data }) => { if (data?.value != null) setYear(String(data.value)) })
   }, [])
 
   const prizes = getPrizeDistribution(entryCount)
@@ -102,7 +101,7 @@ export default function HomePage() {
 
         <div className="max-w-5xl mx-auto px-4 pt-16 pb-12 text-center">
           <p className="text-amber-400 text-sm tracking-[0.3em] uppercase mb-4 font-medium">
-            NCAA Tournament 2025
+            NCAA Tournament {year || new Date().getFullYear()}
           </p>
           <h1 className="font-bebas text-6xl sm:text-8xl lg:text-9xl leading-none mb-2 tracking-wider">
             SEXTON

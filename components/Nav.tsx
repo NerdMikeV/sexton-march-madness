@@ -2,11 +2,21 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { createClient } from '@/lib/supabase/client'
 
 export default function Nav() {
   const pathname = usePathname()
   const [menuOpen, setMenuOpen] = useState(false)
+  const [year, setYear] = useState<string>('')
+
+  useEffect(() => {
+    const supabase = createClient()
+    supabase.from('settings').select('value').eq('key', 'contest_year').single()
+      .then(({ data }) => {
+        if (data?.value != null) setYear(String(data.value))
+      })
+  }, [])
 
   const links = [
     { href: '/', label: 'Home' },
@@ -25,7 +35,7 @@ export default function Nav() {
           <span className="text-2xl font-bebas tracking-widest text-amber-400">
             SEXTON <span className="text-white">MM</span>
           </span>
-          <span className="text-xs text-white/40 hidden sm:inline">2025</span>
+          {year && <span className="text-xs text-white/40 hidden sm:inline">{year}</span>}
         </Link>
 
         {/* Desktop links */}
