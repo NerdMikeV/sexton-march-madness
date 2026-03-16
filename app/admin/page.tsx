@@ -41,6 +41,7 @@ export default function AdminPage() {
 
   // Settings state
   const [deadline, setDeadline] = useState('')
+  const [picksRevealAt, setPicksRevealAt] = useState('')
   const [settingsSaved, setSettingsSaved] = useState(false)
   const [resetting, setResetting] = useState(false)
   const [resetResult, setResetResult] = useState('')
@@ -116,10 +117,11 @@ export default function AdminPage() {
   }, [supabase])
 
   const fetchSettings = useCallback(async () => {
-    const { data } = await supabase.from('settings').select('*').eq('key', 'entry_deadline').single()
-    if (data) {
-      const val = typeof data.value === 'string' ? data.value.replace(/^"|"$/g, '') : ''
-      setDeadline(val.slice(0, 16))
+    const { data } = await supabase.from('settings').select('*').in('key', ['entry_deadline', 'picks_reveal_at'])
+    for (const row of data ?? []) {
+      const val = typeof row.value === 'string' ? row.value.replace(/^"|"$/g, '') : String(row.value)
+      if (row.key === 'entry_deadline') setDeadline(val.slice(0, 16))
+      if (row.key === 'picks_reveal_at') setPicksRevealAt(val.slice(0, 16))
     }
   }, [supabase])
 
@@ -260,10 +262,12 @@ export default function AdminPage() {
   }
 
   async function saveSettings() {
+    const body: Record<string, string> = { entry_deadline: new Date(deadline).toISOString() }
+    if (picksRevealAt) body.picks_reveal_at = new Date(picksRevealAt).toISOString()
     const res = await fetch('/api/admin/settings', {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ entry_deadline: new Date(deadline).toISOString() }),
+      body: JSON.stringify(body),
     })
     if (res.ok) {
       setSettingsSaved(true)
@@ -493,11 +497,11 @@ export default function AdminPage() {
               </button>
             </div>
 
-            {/* Simulate 2025 results */}
+            {/* Simulate historical results (for testing) */}
             <div className="bg-white/3 border border-amber-500/20 rounded-2xl p-6">
-              <h3 className="font-bebas text-xl tracking-widest mb-1 text-amber-400">SIMULATE 2025 TOURNAMENT</h3>
+              <h3 className="font-bebas text-xl tracking-widest mb-1 text-amber-400">SIMULATE TOURNAMENT (TEST DATA)</h3>
               <p className="text-white/40 text-sm mb-4">
-                Bulk-insert all 63 game results from the 2025 NCAA Tournament (Florida champion, beat Houston 65-63).
+                Bulk-insert all 63 game results from the 2025 NCAA Tournament (Florida champion, beat Houston 65-63) for testing purposes.
                 Includes upsets: McNeese over Clemson &amp; Purdue, Colorado State over Memphis &amp; Maryland, and more.
                 <span className="text-red-400"> Clears all existing results first.</span>
               </p>
@@ -511,7 +515,7 @@ export default function AdminPage() {
                 disabled={simulating}
                 className="bg-amber-500/10 hover:bg-amber-500/20 disabled:opacity-40 border border-amber-500/40 text-amber-400 font-bold px-6 py-2.5 rounded-lg text-sm transition-colors"
               >
-                {simulating ? 'Simulating...' : '⚡ SIMULATE 2025 RESULTS (63 games)'}
+                {simulating ? 'Simulating...' : '⚡ LOAD TEST RESULTS (63 games — 2025 data)'}
               </button>
             </div>
 
@@ -650,14 +654,29 @@ export default function AdminPage() {
             {/* Entry deadline */}
             <div className="bg-white/3 border border-white/10 rounded-2xl p-6">
               <h3 className="font-bebas text-xl tracking-widest mb-4 text-amber-400">CONTEST SETTINGS</h3>
-              <div>
-                <label className="text-white/60 text-sm block mb-2">Entry Deadline</label>
-                <input
-                  type="datetime-local"
-                  value={deadline}
-                  onChange={e => setDeadline(e.target.value)}
-                  className="w-full bg-white/5 border border-white/20 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-amber-500"
-                />
+              <div className="space-y-4">
+                <div>
+                  <label className="text-white/60 text-sm block mb-2">Entry Deadline</label>
+                  <input
+                    type="datetime-local"
+                    value={deadline}
+                    onChange={e => setDeadline(e.target.value)}
+                    className="w-full bg-white/5 border border-white/20 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-amber-500"
+                  />
+                </div>
+                <div>
+                  <label className="text-white/60 text-sm block mb-2">
+                    Picks Reveal Date
+                    <span className="text-white/30 font-normal ml-2">— leaderboard shows full detail (picks, scores) after this time</span>
+                  </label>
+                  <input
+                    type="datetime-local"
+                    value={picksRevealAt}
+                    onChange={e => setPicksRevealAt(e.target.value)}
+                    className="w-full bg-white/5 border border-white/20 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-amber-500"
+                  />
+                  <p className="text-white/25 text-xs mt-1.5">Set to tournament start time (e.g. March 19, 2026 10:00 AM CT)</p>
+                </div>
               </div>
               {settingsSaved && (
                 <div className="mt-3 text-green-400 text-sm">Settings saved!</div>

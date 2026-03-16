@@ -210,8 +210,9 @@ CREATE POLICY "Admins can manage admins" ON admins FOR ALL USING (is_admin());
 -- ============================================================
 
 INSERT INTO settings (key, value) VALUES
-  ('entry_deadline', '"2025-03-20T23:59:59Z"'),
-  ('contest_year', '2025'),
+  ('entry_deadline', '"2026-03-19T04:59:59Z"'),
+  ('contest_year', '2026'),
+  ('picks_reveal_at', '"2026-03-19T15:00:00Z"'),
   ('admin_emails', '[{"email":"michael@example.com"},{"email":"taylor@example.com"}]')
 ON CONFLICT (key) DO NOTHING;
 

@@ -56,6 +56,8 @@ export default function LeaderboardPage() {
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null)
   const [entryCount, setEntryCount] = useState(0)
   const [remainingByEntry, setRemainingByEntry] = useState<Record<string, RemainingTeam[]>>({})
+  const [picksRevealAt, setPicksRevealAt] = useState<Date | null>(null)
+  const [now, setNow] = useState(() => new Date())
 
   const fetchLeaderboard = useCallback(async () => {
     const res = await fetch('/api/leaderboard')
@@ -92,8 +94,17 @@ export default function LeaderboardPage() {
 
   const fetchEntryCount = useCallback(async () => {
     const supabase = createClient()
-    const { count } = await supabase.from('entries').select('id', { count: 'exact', head: true })
+    const [{ count }, { data: revealData }] = await Promise.all([
+      supabase.from('entries').select('id', { count: 'exact', head: true }),
+      supabase.from('settings').select('value').eq('key', 'picks_reveal_at').single(),
+    ])
     setEntryCount(count || 0)
+    if (revealData?.value) {
+      const raw = typeof revealData.value === 'string'
+        ? revealData.value.replace(/^"|"$/g, '')
+        : String(revealData.value)
+      setPicksRevealAt(new Date(raw))
+    }
   }, [])
 
   useEffect(() => {
@@ -118,6 +129,12 @@ export default function LeaderboardPage() {
       supabase.removeChannel(channel)
     }
   }, [fetchLeaderboard, fetchEntryCount])
+
+  // Tick clock while waiting for picks reveal
+  useEffect(() => {
+    const id = setInterval(() => setNow(new Date()), 1000)
+    return () => clearInterval(id)
+  }, [])
 
   async function toggleExpand(entryId: string) {
     if (expandedId === entryId) {
@@ -201,136 +218,203 @@ export default function LeaderboardPage() {
         </div>
 
         {/* Leaderboard */}
-        {loading ? (
-          <div className="space-y-2">
-            {Array.from({ length: 5 }).map((_, i) => (
-              <div key={i} className="h-16 bg-white/5 rounded-xl animate-pulse" />
-            ))}
-          </div>
-        ) : entries.length === 0 ? (
-          <div className="text-center py-20">
-            <div className="font-bebas text-4xl text-white/20 mb-2">NO ENTRIES YET</div>
-            <p className="text-white/30 text-sm">Be the first to enter!</p>
-            <a href="/enter" className="inline-block mt-4 bg-amber-500 text-black font-bold px-6 py-2 rounded-lg">
-              ENTER NOW
-            </a>
-          </div>
-        ) : (
-          <div className="space-y-2">
-            <AnimatePresence>
-              {entries.map((entry, idx) => {
-                const rank = idx + 1
-                const rankStyle = RANK_STYLES[rank]
-                const isExpanded = expandedId === entry.entry_id
+        {(() => {
+          const picksRevealed = picksRevealAt === null || now >= picksRevealAt
 
-                return (
-                  <motion.div
-                    key={entry.entry_id}
-                    layout
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: idx * 0.03 }}
-                    className={`rounded-xl border overflow-hidden ${rankStyle?.row || 'bg-white/3 border-white/10'}`}
-                  >
-                    {/* Main row */}
-                    <button
-                      onClick={() => toggleExpand(entry.entry_id)}
-                      className="w-full flex items-center gap-4 px-4 py-4 text-left hover:bg-white/3 transition-colors"
+          if (loading) {
+            return (
+              <div className="space-y-2">
+                {Array.from({ length: 5 }).map((_, i) => (
+                  <div key={i} className="h-16 bg-white/5 rounded-xl animate-pulse" />
+                ))}
+              </div>
+            )
+          }
+
+          // ── PRE-REVEAL: names only ─────────────────────────────────────────
+          if (!picksRevealed && picksRevealAt) {
+            const diff = picksRevealAt.getTime() - now.getTime()
+            const days    = Math.floor(diff / (1000 * 60 * 60 * 24))
+            const hours   = Math.floor((diff / (1000 * 60 * 60)) % 24)
+            const minutes = Math.floor((diff / (1000 * 60)) % 60)
+            const seconds = Math.floor((diff / 1000) % 60)
+
+            return (
+              <>
+                {/* Reveal countdown banner */}
+                <div className="bg-amber-500/8 border border-amber-500/25 rounded-2xl p-6 mb-6 text-center">
+                  <div className="text-amber-400/70 text-xs uppercase tracking-widest mb-2">Picks revealed when tournament starts</div>
+                  <div className="flex gap-3 justify-center mb-3">
+                    {[
+                      { label: 'DAYS',  val: days },
+                      { label: 'HRS',   val: hours },
+                      { label: 'MINS',  val: minutes },
+                      { label: 'SECS',  val: seconds },
+                    ].map(({ label, val }) => (
+                      <div key={label} className="bg-white/5 border border-white/10 rounded-lg px-3 py-2 min-w-[58px]">
+                        <div className="font-bebas text-3xl text-amber-400 leading-none">{String(val).padStart(2, '0')}</div>
+                        <div className="text-white/30 text-[10px] tracking-widest mt-0.5">{label}</div>
+                      </div>
+                    ))}
+                  </div>
+                  <p className="text-white/30 text-xs">
+                    Full scores and team picks become visible on{' '}
+                    {picksRevealAt.toLocaleString('en-US', { month: 'long', day: 'numeric', hour: 'numeric', minute: '2-digit', timeZoneName: 'short' })}
+                  </p>
+                </div>
+
+                {/* Names-only list */}
+                {entryCount === 0 ? (
+                  <div className="text-center py-16">
+                    <div className="font-bebas text-4xl text-white/20 mb-2">NO ENTRIES YET</div>
+                    <p className="text-white/30 text-sm">Be the first to enter!</p>
+                    <a href="/enter" className="inline-block mt-4 bg-amber-500 text-black font-bold px-6 py-2 rounded-lg">ENTER NOW</a>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {Array.from({ length: entryCount }).map((_, idx) => (
+                      <div key={idx} className="bg-white/3 border border-white/10 rounded-xl px-4 py-3 flex items-center gap-3">
+                        <div className="w-7 h-7 rounded-full bg-white/8 flex items-center justify-center text-xs text-white/40 font-bold flex-shrink-0">
+                          {idx + 1}
+                        </div>
+                        <div className="w-32 h-3.5 bg-white/8 rounded animate-pulse" />
+                      </div>
+                    ))}
+                    <p className="text-white/20 text-xs text-center pt-2">Names hidden until tournament starts</p>
+                  </div>
+                )}
+              </>
+            )
+          }
+
+          // ── POST-REVEAL: full leaderboard ──────────────────────────────────
+          if (entries.length === 0) {
+            return (
+              <div className="text-center py-20">
+                <div className="font-bebas text-4xl text-white/20 mb-2">NO ENTRIES YET</div>
+                <p className="text-white/30 text-sm">Be the first to enter!</p>
+                <a href="/enter" className="inline-block mt-4 bg-amber-500 text-black font-bold px-6 py-2 rounded-lg">
+                  ENTER NOW
+                </a>
+              </div>
+            )
+          }
+
+          return (
+            <div className="space-y-2">
+              <AnimatePresence>
+                {entries.map((entry, idx) => {
+                  const rank = idx + 1
+                  const rankStyle = RANK_STYLES[rank]
+                  const isExpanded = expandedId === entry.entry_id
+
+                  return (
+                    <motion.div
+                      key={entry.entry_id}
+                      layout
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: idx * 0.03 }}
+                      className={`rounded-xl border overflow-hidden ${rankStyle?.row || 'bg-white/3 border-white/10'}`}
                     >
-                      {/* Rank badge */}
-                      <div className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${rankStyle?.badge || 'bg-white/10 text-white/60'}`}>
-                        {rank}
-                      </div>
-
-                      {/* Name */}
-                      <div className="flex-1 min-w-0">
-                        <div className="font-semibold text-white truncate">{entry.participant_name}</div>
-                        <RemainingTeamsLine
-                          remaining={remainingByEntry[entry.entry_id] ?? null}
-                          upsetCount={entry.upset_count}
-                        />
-                      </div>
-
-                      {/* Points */}
-                      <div className="text-right flex-shrink-0">
-                        <motion.div
-                          key={entry.total_points}
-                          className={`font-bebas text-2xl ${rank === 1 ? 'text-amber-400' : 'text-white'}`}
-                          initial={{ scale: 1.2, color: '#f59e0b' }}
-                          animate={{ scale: 1 }}
-                          transition={{ duration: 0.3 }}
-                        >
-                          {entry.total_points}
-                        </motion.div>
-                        <div className="text-white/30 text-xs">pts</div>
-                        {entry.tiebreaker_total != null && (
-                          <div className="text-white/25 text-xs mt-0.5">TB: {entry.tiebreaker_total}</div>
-                        )}
-                      </div>
-
-                      {/* Expand chevron */}
-                      <svg
-                        className={`w-4 h-4 text-white/30 flex-shrink-0 transition-transform ${isExpanded ? 'rotate-180' : ''}`}
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        stroke="currentColor"
+                      {/* Main row */}
+                      <button
+                        onClick={() => toggleExpand(entry.entry_id)}
+                        className="w-full flex items-center gap-4 px-4 py-4 text-left hover:bg-white/3 transition-colors"
                       >
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                      </svg>
-                    </button>
+                        {/* Rank badge */}
+                        <div className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${rankStyle?.badge || 'bg-white/10 text-white/60'}`}>
+                          {rank}
+                        </div>
 
-                    {/* Expanded picks */}
-                    <AnimatePresence>
-                      {isExpanded && (
-                        <motion.div
-                          initial={{ height: 0, opacity: 0 }}
-                          animate={{ height: 'auto', opacity: 1 }}
-                          exit={{ height: 0, opacity: 0 }}
-                          transition={{ duration: 0.2 }}
-                          className="overflow-hidden"
+                        {/* Name */}
+                        <div className="flex-1 min-w-0">
+                          <div className="font-semibold text-white truncate">{entry.participant_name}</div>
+                          <RemainingTeamsLine
+                            remaining={remainingByEntry[entry.entry_id] ?? null}
+                            upsetCount={entry.upset_count}
+                          />
+                        </div>
+
+                        {/* Points */}
+                        <div className="text-right flex-shrink-0">
+                          <motion.div
+                            key={entry.total_points}
+                            className={`font-bebas text-2xl ${rank === 1 ? 'text-amber-400' : 'text-white'}`}
+                            initial={{ scale: 1.2, color: '#f59e0b' }}
+                            animate={{ scale: 1 }}
+                            transition={{ duration: 0.3 }}
+                          >
+                            {entry.total_points}
+                          </motion.div>
+                          <div className="text-white/30 text-xs">pts</div>
+                          {entry.tiebreaker_total != null && (
+                            <div className="text-white/25 text-xs mt-0.5">TB: {entry.tiebreaker_total}</div>
+                          )}
+                        </div>
+
+                        {/* Expand chevron */}
+                        <svg
+                          className={`w-4 h-4 text-white/30 flex-shrink-0 transition-transform ${isExpanded ? 'rotate-180' : ''}`}
+                          fill="none" viewBox="0 0 24 24" stroke="currentColor"
                         >
-                          <div className="px-4 pb-4 border-t border-white/10 pt-4">
-                            {expandedData[entry.entry_id] ? (
-                              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                                {expandedData[entry.entry_id]!
-                                  .sort((a, b) => a.team!.seed - b.team!.seed)
-                                  .map(pick => (
-                                    <div key={pick.id} className={`bg-white/5 rounded-lg p-2.5 flex items-center gap-2 ${pick.team?.is_eliminated ? 'opacity-50' : ''}`}>
-                                      <span className={`inline-flex items-center justify-center w-6 h-6 rounded-full text-xs font-bold flex-shrink-0 ${getSeedBadgeColor(pick.team!.seed)}`}>
-                                        {pick.team!.seed}
-                                      </span>
-                                      <div className="min-w-0 flex-1">
-                                        <div className={`text-xs font-medium truncate ${pick.team?.is_eliminated ? 'line-through text-white/30' : 'text-white/80'}`}>
-                                          {pick.team?.name}
-                                        </div>
-                                        {pick.points > 0 ? (
-                                          <div className="flex items-center gap-1">
-                                            <span className="text-amber-400 text-xs font-bold">+{pick.points}</span>
-                                            {pick.isUpset && <span className="text-purple-400 text-xs">⚡</span>}
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                        </svg>
+                      </button>
+
+                      {/* Expanded picks */}
+                      <AnimatePresence>
+                        {isExpanded && (
+                          <motion.div
+                            initial={{ height: 0, opacity: 0 }}
+                            animate={{ height: 'auto', opacity: 1 }}
+                            exit={{ height: 0, opacity: 0 }}
+                            transition={{ duration: 0.2 }}
+                            className="overflow-hidden"
+                          >
+                            <div className="px-4 pb-4 border-t border-white/10 pt-4">
+                              {expandedData[entry.entry_id] ? (
+                                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                                  {expandedData[entry.entry_id]!
+                                    .sort((a, b) => a.team!.seed - b.team!.seed)
+                                    .map(pick => (
+                                      <div key={pick.id} className={`bg-white/5 rounded-lg p-2.5 flex items-center gap-2 ${pick.team?.is_eliminated ? 'opacity-50' : ''}`}>
+                                        <span className={`inline-flex items-center justify-center w-6 h-6 rounded-full text-xs font-bold flex-shrink-0 ${getSeedBadgeColor(pick.team!.seed)}`}>
+                                          {pick.team!.seed}
+                                        </span>
+                                        <div className="min-w-0 flex-1">
+                                          <div className={`text-xs font-medium truncate ${pick.team?.is_eliminated ? 'line-through text-white/30' : 'text-white/80'}`}>
+                                            {pick.team?.name}
                                           </div>
-                                        ) : (
-                                          <div className="text-white/20 text-xs">0 pts</div>
-                                        )}
+                                          {pick.points > 0 ? (
+                                            <div className="flex items-center gap-1">
+                                              <span className="text-amber-400 text-xs font-bold">+{pick.points}</span>
+                                              {pick.isUpset && <span className="text-purple-400 text-xs">⚡</span>}
+                                            </div>
+                                          ) : (
+                                            <div className="text-white/20 text-xs">0 pts</div>
+                                          )}
+                                        </div>
                                       </div>
-                                    </div>
-                                  ))}
-                              </div>
-                            ) : (
-                              <div className="text-white/30 text-sm text-center py-4">Loading picks...</div>
-                            )}
-                          </div>
-                        </motion.div>
-                      )}
-                    </AnimatePresence>
-                  </motion.div>
-                )
-              })}
-            </AnimatePresence>
-          </div>
-        )}
+                                    ))}
+                                </div>
+                              ) : (
+                                <div className="text-white/30 text-sm text-center py-4">Loading picks...</div>
+                              )}
+                            </div>
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
+                    </motion.div>
+                  )
+                })}
+              </AnimatePresence>
+            </div>
+          )
+        })()}
 
         {/* Round legend */}
-        {!loading && entries.length > 0 && (
+        {!loading && (picksRevealAt === null || now >= picksRevealAt) && entries.length > 0 && (
           <div className="mt-8 bg-white/3 border border-white/10 rounded-xl p-4">
             <h3 className="text-white/40 text-xs uppercase tracking-widest mb-3">Round Points Reference</h3>
             <div className="grid grid-cols-3 sm:grid-cols-6 gap-2 text-center text-xs">
