@@ -18,7 +18,7 @@ export interface OddsGame {
 
 // ── Fuzzy matching helpers ────────────────────────────────────────────────────
 
-/** Lowercase, strip punctuation/apostrophes, collapse spaces */
+/** Lowercase, strip apostrophes and punctuation, collapse spaces */
 function normalize(name: string): string {
   return name
     .toLowerCase()
@@ -29,26 +29,46 @@ function normalize(name: string): string {
 }
 
 /**
- * Expand common abbreviations so that e.g. "UConn" and "Connecticut" both
- * become "connecticut", and "Saint Mary's" / "St. Mary's" both become
- * "saint marys".
+ * Expand abbreviations to canonical forms:
+ *   - Leading "st" → "saint"   (St. John's, St. Mary's)
+ *   - Non-leading "st" → "state" (Michigan St, Iowa St, Colorado St)
+ *   - "uconn" → "connecticut"
+ *   - "unc" → "north carolina"
+ *
+ * Order matters: uconn/unc must be replaced before the st rules.
  */
 function expand(name: string): string {
   return normalize(name)
     .replace(/\buconn\b/g, 'connecticut')
     .replace(/\bunc\b/g, 'north carolina')
-    .replace(/\bst\b/g, 'saint')   // must come after uconn/unc replacements
+    .replace(/^st\b/, 'saint')   // "st" as first word → saint
+    .replace(/\bst\b/g, 'state') // "st" elsewhere → state (Michigan St, etc.)
 }
 
 /**
- * Returns true when the Odds API team name matches a DB team name.
- * Only exact match after normalization + abbreviation expansion is used.
- * Substring and token-overlap checks are intentionally omitted to avoid
- * false positives like "South Alabama" matching "Alabama".
+ * Check whether the Odds API name (which includes the mascot, e.g.
+ * "Duke Blue Devils") matches a single DB name (e.g. "Duke").
+ *
+ * Strategy: after expansion, the Odds API name should START WITH the DB name.
+ * This strips mascots implicitly and avoids false positives like
+ * "South Alabama Jaguars" matching DB "Alabama" (because
+ * "south alabama jaguars" does NOT start with "alabama").
+ *
+ * For play-in entries stored as "TeamA/TeamB" in the DB, each half is
+ * checked separately.
  */
+function matchesDbName(oddsExpanded: string, dbName: string): boolean {
+  // Handle play-in pairs like "UMBC/Howard"
+  const parts = dbName.split('/')
+  return parts.some(part => {
+    const e = expand(part.trim())
+    return oddsExpanded === e || oddsExpanded.startsWith(e + ' ')
+  })
+}
+
 function matchesAnyTeam(oddsName: string, dbNames: string[]): boolean {
   const e1 = expand(oddsName)
-  return dbNames.some(dbName => e1 === expand(dbName))
+  return dbNames.some(dbName => matchesDbName(e1, dbName))
 }
 
 function isTournamentGame(game: OddsGame, dbNames: string[]): boolean {
