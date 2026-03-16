@@ -58,6 +58,7 @@ export default function LeaderboardPage() {
   const [remainingByEntry, setRemainingByEntry] = useState<Record<string, RemainingTeam[]>>({})
   const [picksRevealAt, setPicksRevealAt] = useState<Date | null>(null)
   const [now, setNow] = useState(() => new Date())
+  const [preRevealNames, setPreRevealNames] = useState<{ id: string; participant_name: string }[]>([])
 
   const fetchLeaderboard = useCallback(async () => {
     const res = await fetch('/api/leaderboard')
@@ -94,11 +95,12 @@ export default function LeaderboardPage() {
 
   const fetchEntryCount = useCallback(async () => {
     const supabase = createClient()
-    const [{ count }, { data: revealData }] = await Promise.all([
-      supabase.from('entries').select('id', { count: 'exact', head: true }),
+    const [{ data: entriesData }, { data: revealData }] = await Promise.all([
+      supabase.from('entries').select('id, participant_name').order('submitted_at', { ascending: true }),
       supabase.from('settings').select('value').eq('key', 'picks_reveal_at').single(),
     ])
-    setEntryCount(count || 0)
+    setEntryCount(entriesData?.length || 0)
+    setPreRevealNames(entriesData ?? [])
     if (revealData?.value) {
       const raw = typeof revealData.value === 'string'
         ? revealData.value.replace(/^"|"$/g, '')
@@ -231,7 +233,7 @@ export default function LeaderboardPage() {
             )
           }
 
-          // ── PRE-REVEAL: names only ─────────────────────────────────────────
+          // ── PRE-REVEAL: names visible, picks/scores hidden ────────────────
           if (!picksRevealed && picksRevealAt) {
             const diff = picksRevealAt.getTime() - now.getTime()
             const days    = Math.floor(diff / (1000 * 60 * 60 * 24))
@@ -258,13 +260,13 @@ export default function LeaderboardPage() {
                     ))}
                   </div>
                   <p className="text-white/30 text-xs">
-                    Full scores and team picks become visible on{' '}
+                    Scores and team picks become visible on{' '}
                     {picksRevealAt.toLocaleString('en-US', { month: 'long', day: 'numeric', hour: 'numeric', minute: '2-digit', timeZoneName: 'short' })}
                   </p>
                 </div>
 
-                {/* Names-only list */}
-                {entryCount === 0 ? (
+                {/* Names list — no scores, no picks, no expand */}
+                {preRevealNames.length === 0 ? (
                   <div className="text-center py-16">
                     <div className="font-bebas text-4xl text-white/20 mb-2">NO ENTRIES YET</div>
                     <p className="text-white/30 text-sm">Be the first to enter!</p>
@@ -272,15 +274,17 @@ export default function LeaderboardPage() {
                   </div>
                 ) : (
                   <div className="space-y-2">
-                    {Array.from({ length: entryCount }).map((_, idx) => (
-                      <div key={idx} className="bg-white/3 border border-white/10 rounded-xl px-4 py-3 flex items-center gap-3">
-                        <div className="w-7 h-7 rounded-full bg-white/8 flex items-center justify-center text-xs text-white/40 font-bold flex-shrink-0">
+                    {preRevealNames.map((e, idx) => (
+                      <div key={e.id} className="bg-white/3 border border-white/10 rounded-xl px-4 py-3.5 flex items-center gap-3">
+                        <div className="w-8 h-8 rounded-full bg-white/8 flex items-center justify-center text-sm text-white/40 font-bold flex-shrink-0">
                           {idx + 1}
                         </div>
-                        <div className="w-32 h-3.5 bg-white/8 rounded animate-pulse" />
+                        <div className="flex-1 min-w-0">
+                          <div className="font-semibold text-white truncate">{e.participant_name}</div>
+                          <div className="text-white/30 text-xs mt-0.5">Picks hidden until tournament starts</div>
+                        </div>
                       </div>
                     ))}
-                    <p className="text-white/20 text-xs text-center pt-2">Names hidden until tournament starts</p>
                   </div>
                 )}
               </>
