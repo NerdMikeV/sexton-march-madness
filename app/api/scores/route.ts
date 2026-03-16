@@ -41,29 +41,14 @@ function expand(name: string): string {
 }
 
 /**
- * Returns true when the Odds API team name fuzzy-matches any name in dbNames.
- * Strategies (in order):
- *   1. Exact match after expansion
- *   2. One expanded name is a substring of the other (handles e.g. "Omaha"
- *      in "Nebraska Omaha")
- *   3. Token overlap — at least ⌈60 %⌉ of the shorter name's meaningful
- *      tokens (length ≥ 4) appear in the other name
+ * Returns true when the Odds API team name matches a DB team name.
+ * Only exact match after normalization + abbreviation expansion is used.
+ * Substring and token-overlap checks are intentionally omitted to avoid
+ * false positives like "South Alabama" matching "Alabama".
  */
 function matchesAnyTeam(oddsName: string, dbNames: string[]): boolean {
   const e1 = expand(oddsName)
-  return dbNames.some(dbName => {
-    const e2 = expand(dbName)
-    if (e1 === e2) return true
-    if (e1.includes(e2) || e2.includes(e1)) return true
-
-    const tokens1 = e1.split(' ').filter(t => t.length >= 4)
-    const tokens2 = e2.split(' ').filter(t => t.length >= 4)
-    if (tokens1.length === 0 || tokens2.length === 0) return false
-
-    const overlap = tokens1.filter(t => tokens2.includes(t))
-    const minLen = Math.min(tokens1.length, tokens2.length)
-    return overlap.length >= Math.ceil(minLen * 0.6)
-  })
+  return dbNames.some(dbName => e1 === expand(dbName))
 }
 
 // ── Route handler ─────────────────────────────────────────────────────────────
