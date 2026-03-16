@@ -51,6 +51,14 @@ function matchesAnyTeam(oddsName: string, dbNames: string[]): boolean {
   return dbNames.some(dbName => e1 === expand(dbName))
 }
 
+function isTournamentGame(game: OddsGame, dbNames: string[]): boolean {
+  return (
+    dbNames.length === 0 ||
+    matchesAnyTeam(game.home_team, dbNames) ||
+    matchesAnyTeam(game.away_team, dbNames)
+  )
+}
+
 // ── Route handler ─────────────────────────────────────────────────────────────
 
 export async function GET() {
@@ -66,47 +74,67 @@ export async function GET() {
     )
   }
 
-  const url = new URL('https://api.the-odds-api.com/v4/sports/basketball_ncaab/scores/')
-  url.searchParams.set('apiKey', apiKey)
-  url.searchParams.set('daysFrom', '1')
+  const scoresUrl = new URL('https://api.the-odds-api.com/v4/sports/basketball_ncaab/scores/')
+  scoresUrl.searchParams.set('apiKey', apiKey)
+  scoresUrl.searchParams.set('daysFrom', '1')
 
-  // Fetch Odds API data and tournament teams in parallel
+  const eventsUrl = new URL('https://api.the-odds-api.com/v4/sports/basketball_ncaab/events/')
+  eventsUrl.searchParams.set('apiKey', apiKey)
+
+  // Fetch all three sources in parallel
   const supabase = await createClient()
-  let oddsRes: Response
+  let scoresRes: Response
+  let eventsRes: Response
   let teamsData: { name: string }[] | null = null
+
   try {
-    ;[oddsRes, { data: teamsData }] = await Promise.all([
-      fetch(url.toString()),
+    ;[scoresRes, eventsRes, { data: teamsData }] = await Promise.all([
+      fetch(scoresUrl.toString()),
+      fetch(eventsUrl.toString()),
       supabase.from('teams').select('name'),
     ])
   } catch {
     return NextResponse.json({ error: 'Failed to reach The Odds API' }, { status: 502 })
   }
 
-  if (!oddsRes.ok) {
-    const body = await oddsRes.text()
+  if (!scoresRes.ok) {
+    const body = await scoresRes.text()
     return NextResponse.json(
-      { error: `Odds API returned ${oddsRes.status}: ${body}` },
-      { status: oddsRes.status }
+      { error: `Odds API returned ${scoresRes.status}: ${body}` },
+      { status: scoresRes.status }
     )
   }
 
-  const data: OddsGame[] = await oddsRes.json()
-  const remainingRequests = oddsRes.headers.get('x-requests-remaining')
-  const usedRequests = oddsRes.headers.get('x-requests-used')
+  const scoresData: OddsGame[] = await scoresRes.json()
+  // Use quota headers from the scores call (both calls consume quota)
+  const remainingRequests = scoresRes.headers.get('x-requests-remaining')
+  const usedRequests = scoresRes.headers.get('x-requests-used')
 
-  // If the DB fetch failed or teams aren't seeded yet, return all games
-  // (graceful degradation so scores work even if Supabase is unreachable)
+  // Events endpoint returns objects without scores/completed — normalise to OddsGame shape
+  let eventsData: OddsGame[] = []
+  if (eventsRes.ok) {
+    const raw: Omit<OddsGame, 'completed' | 'scores' | 'last_update'>[] = await eventsRes.json()
+    eventsData = raw.map(e => ({
+      ...e,
+      completed: false,
+      scores: null,
+      last_update: null,
+    }))
+  }
+
+  // Merge: scores data takes precedence (has live/final info); events fills in
+  // upcoming games not yet in the scores feed. Deduplicate by id.
+  const seen = new Set<string>()
+  const merged: OddsGame[] = []
+  for (const game of [...scoresData, ...eventsData]) {
+    if (!seen.has(game.id)) {
+      seen.add(game.id)
+      merged.push(game)
+    }
+  }
+
   const dbNames: string[] = teamsData?.map(t => t.name) ?? []
-
-  const games =
-    dbNames.length === 0
-      ? data // fallback: DB not seeded yet, show everything
-      : data.filter(
-          game =>
-            matchesAnyTeam(game.home_team, dbNames) ||
-            matchesAnyTeam(game.away_team, dbNames)
-        )
+  const games = merged.filter(game => isTournamentGame(game, dbNames))
 
   return NextResponse.json({ games, remainingRequests, usedRequests })
 }
