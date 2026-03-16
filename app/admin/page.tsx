@@ -590,6 +590,9 @@ export default function AdminPage() {
                           )}
                           <div className="text-white/30 text-xs mt-0.5">
                             {new Date(entry.submitted_at).toLocaleDateString()} · {entry.picks.length} picks
+                            {entry.tiebreaker_total != null && (
+                              <span className="ml-2 text-white/40">TB: {entry.tiebreaker_total}</span>
+                            )}
                           </div>
                         </div>
                         <div className="flex gap-2 flex-shrink-0">

@@ -12,6 +12,7 @@ export type Entry = {
   participant_email: string | null
   paid: boolean
   submitted_at: string
+  tiebreaker_total: number | null
 }
 
 export type EntryPick = {
@@ -38,6 +39,7 @@ export type LeaderboardEntry = {
   total_points: number
   total_wins: number
   upset_count: number
+  tiebreaker_total: number | null
 }
 
 export const ROUND_NAMES: Record<number, string> = {

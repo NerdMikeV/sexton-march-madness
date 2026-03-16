@@ -28,6 +28,7 @@ export default function EnterPage() {
   const [email, setEmail] = useState('')
   const [activeRegion, setActiveRegion] = useState('South')
   const [search, setSearch] = useState('')
+  const [tiebreaker, setTiebreaker] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [submitted, setSubmitted] = useState(false)
   const [entryId, setEntryId] = useState('')
@@ -116,6 +117,11 @@ export default function EnterPage() {
       setError(`Please pick exactly 8 teams. You have ${selectedIds.size}.`)
       return
     }
+    const tbNum = parseInt(tiebreaker)
+    if (!tiebreaker.trim() || isNaN(tbNum) || tbNum < 0) {
+      setError('Please enter a valid tiebreaker score (the predicted combined championship total).')
+      return
+    }
     setSubmitting(true)
     try {
       const res = await fetch('/api/entries', {
@@ -125,6 +131,7 @@ export default function EnterPage() {
           participantName: name.trim(),
           participantEmail: email.trim() || null,
           teamIds: Array.from(selectedIds),
+          tiebreakerTotal: tbNum,
         }),
       })
       const json = await res.json()
@@ -228,7 +235,7 @@ export default function EnterPage() {
               View My Entries
             </Link>
             <button
-              onClick={() => { setSubmitted(false); setSelectedIds(new Set()); setName(''); setEmail('') }}
+              onClick={() => { setSubmitted(false); setSelectedIds(new Set()); setName(''); setEmail(''); setTiebreaker('') }}
               className="flex-1 text-center border border-white/15 hover:border-white/30 text-white/60 hover:text-white text-sm font-medium px-4 py-2.5 rounded-xl transition-colors"
             >
               Submit Another Entry
@@ -251,7 +258,7 @@ export default function EnterPage() {
         <p className="text-white/50 mb-8">Pick exactly 8 teams — one per seed line. $25 per entry.</p>
 
         {/* Info fields */}
-        <div className="grid sm:grid-cols-2 gap-4 mb-8">
+        <div className="grid sm:grid-cols-2 gap-4 mb-4">
           <div>
             <label className="text-white/60 text-sm block mb-2">Your Name *</label>
             <input
@@ -272,6 +279,23 @@ export default function EnterPage() {
               className="w-full bg-white/5 border border-white/20 rounded-lg px-4 py-3 text-white placeholder-white/20 focus:outline-none focus:border-amber-500 transition-colors"
             />
           </div>
+        </div>
+
+        {/* Tiebreaker */}
+        <div className="mb-8">
+          <label className="text-white/60 text-sm block mb-2">
+            Tiebreaker * <span className="text-white/30 font-normal">— Total combined points in the Championship game</span>
+          </label>
+          <input
+            type="number"
+            min="0"
+            max="999"
+            value={tiebreaker}
+            onChange={e => setTiebreaker(e.target.value)}
+            placeholder="e.g. 143"
+            className="w-48 bg-white/5 border border-white/20 rounded-lg px-4 py-3 text-white placeholder-white/20 focus:outline-none focus:border-amber-500 transition-colors"
+          />
+          <p className="text-white/25 text-xs mt-1.5">Used to break ties when two entries finish with the same points.</p>
         </div>
 
         <div className="flex flex-col lg:flex-row gap-6">
@@ -429,7 +453,7 @@ export default function EnterPage() {
 
                 <button
                   onClick={handleSubmit}
-                  disabled={selectedIds.size !== 8 || !name.trim() || !email.trim() || submitting}
+                  disabled={selectedIds.size !== 8 || !name.trim() || !email.trim() || !tiebreaker.trim() || submitting}
                   className="w-full mt-4 bg-amber-500 hover:bg-amber-400 disabled:bg-white/10 disabled:text-white/30 disabled:cursor-not-allowed text-black font-bold py-3 rounded-lg transition-colors"
                 >
                   {submitting ? 'Submitting...' : selectedIds.size === 8 ? 'SUBMIT ENTRY' : `Pick ${8 - selectedIds.size} more`}

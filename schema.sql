@@ -28,7 +28,8 @@ CREATE TABLE IF NOT EXISTS entries (
   participant_name TEXT NOT NULL,
   participant_email TEXT,  -- NOT UNIQUE: multiple entries per email are allowed ($25 each)
   paid BOOLEAN DEFAULT false,
-  submitted_at TIMESTAMPTZ DEFAULT now()
+  submitted_at TIMESTAMPTZ DEFAULT now(),
+  tiebreaker_total INTEGER  -- predicted total combined score in the championship game
 );
 
 CREATE TABLE IF NOT EXISTS entry_picks (
@@ -88,6 +89,7 @@ WITH entry_scores AS (
     e.id as entry_id,
     e.participant_name,
     e.paid,
+    e.tiebreaker_total,
     ep.team_id,
     t.name as team_name,
     t.seed as team_seed,
@@ -115,13 +117,14 @@ SELECT
   entry_id,
   participant_name,
   paid,
+  tiebreaker_total,
   SUM(
     CASE WHEN is_upset THEN base_points * 2 ELSE base_points END
   ) as total_points,
   COUNT(*) as total_wins,
   COUNT(*) FILTER (WHERE is_upset) as upset_count
 FROM entry_scores
-GROUP BY entry_id, participant_name, paid
+GROUP BY entry_id, participant_name, paid, tiebreaker_total
 ORDER BY total_points DESC;
 
 -- ============================================================

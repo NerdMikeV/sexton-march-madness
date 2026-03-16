@@ -263,6 +263,9 @@ export default function LeaderboardPage() {
                           {entry.total_points}
                         </motion.div>
                         <div className="text-white/30 text-xs">pts</div>
+                        {entry.tiebreaker_total != null && (
+                          <div className="text-white/25 text-xs mt-0.5">TB: {entry.tiebreaker_total}</div>
+                        )}
                       </div>
 
                       {/* Expand chevron */}

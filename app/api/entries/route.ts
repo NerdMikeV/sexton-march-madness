@@ -6,7 +6,7 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
 export async function POST(req: NextRequest) {
   const body = await req.json()
-  const { participantName, participantEmail, teamIds } = body
+  const { participantName, participantEmail, teamIds, tiebreakerTotal } = body
 
   if (!participantName?.trim()) {
     return NextResponse.json({ error: 'Name is required' }, { status: 400 })
@@ -22,6 +22,11 @@ export async function POST(req: NextRequest) {
 
   if (!Array.isArray(teamIds) || teamIds.length === 0) {
     return NextResponse.json({ error: 'Team picks required' }, { status: 400 })
+  }
+
+  const tbNum = typeof tiebreakerTotal === 'number' ? tiebreakerTotal : parseInt(tiebreakerTotal)
+  if (tiebreakerTotal == null || isNaN(tbNum) || tbNum < 0) {
+    return NextResponse.json({ error: 'A tiebreaker score is required' }, { status: 400 })
   }
 
   const supabase = await createClient()
@@ -67,6 +72,7 @@ export async function POST(req: NextRequest) {
     .insert({
       participant_name: participantName.trim(),
       participant_email: participantEmail.trim().toLowerCase(),
+      tiebreaker_total: tbNum,
     })
     .select()
     .single()
