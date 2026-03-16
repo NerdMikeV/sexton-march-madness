@@ -154,20 +154,7 @@ export async function GET() {
   }
 
   const dbNames: string[] = teamsData?.map(t => t.name) ?? []
-
-  // ── DEBUG LOGGING ──────────────────────────────────────────────────────────
-  console.log('[scores] DB team count:', dbNames.length)
-  console.log('[scores] scores feed count:', scoresData.length)
-  console.log('[scores] events feed count:', eventsData.length)
-  console.log('[scores] merged (pre-filter):', merged.length)
-  console.log('[scores] merged game list:', merged.map(g => `${g.home_team} vs ${g.away_team}`))
-
   const games = merged.filter(game => isTournamentGame(game, dbNames))
-
-  const dropped = merged.filter(game => !isTournamentGame(game, dbNames))
-  console.log('[scores] filtered (tournament only):', games.length)
-  console.log('[scores] dropped games:', dropped.map(g => `${g.home_team} vs ${g.away_team}`))
-  // ── END DEBUG ──────────────────────────────────────────────────────────────
 
   return NextResponse.json({ games, remainingRequests, usedRequests })
 }

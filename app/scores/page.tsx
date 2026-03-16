@@ -135,14 +135,8 @@ export default function ScoresPage() {
   const fetchScores = useCallback(async () => {
     try {
       const res = await fetch('/api/scores')
-      console.log('[scores] fetch status:', res.status, res.ok)
       const json = await res.json()
-      console.log('[scores] json keys:', Object.keys(json))
-      console.log('[scores] json.games type:', typeof json.games, Array.isArray(json.games))
-      console.log('[scores] json.games length:', json.games?.length)
-      console.log('[scores] first game sample:', json.games?.[0])
       if (!res.ok) {
-        console.log('[scores] error response:', json)
         setError(json.error || 'Failed to load scores')
         return
       }
@@ -153,8 +147,7 @@ export default function ScoresPage() {
         used: json.usedRequests,
       })
       setError('')
-    } catch (err) {
-      console.error('[scores] fetch threw:', err)
+    } catch {
       setError('Network error — could not reach scores API')
     } finally {
       setLoading(false)
@@ -185,8 +178,6 @@ export default function ScoresPage() {
   const liveCount = games.filter(g => getStatus(g) === 'live').length
   const finalCount = games.filter(g => getStatus(g) === 'final').length
   const upcomingCount = games.filter(g => getStatus(g) === 'upcoming').length
-
-  console.log('[scores] render — games:', games.length, 'sorted:', sortedGames.length, 'loading:', loading, 'error:', error)
 
   return (
     <div className="max-w-5xl mx-auto px-4 py-8">
