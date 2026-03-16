@@ -29,20 +29,43 @@ function normalize(name: string): string {
 }
 
 /**
- * Expand abbreviations to canonical forms:
- *   - Leading "st" → "saint"   (St. John's, St. Mary's)
- *   - Non-leading "st" → "state" (Michigan St, Iowa St, Colorado St)
- *   - "uconn" → "connecticut"
- *   - "unc" → "north carolina"
+ * Expand abbreviations and alternate names to canonical forms so that both
+ * the DB name and the Odds API name produce the same string before matching.
  *
- * Order matters: uconn/unc must be replaced before the st rules.
+ * Rules are applied in this order:
+ *   1. Multi-word phrases (longest first, before single-word rules fire)
+ *   2. Single-word abbreviations
+ *   3. "st" context rule: leading → "saint", elsewhere → "state"
+ *
+ * Both sides of the comparison go through expand(), so it doesn't matter
+ * which direction an alias runs as long as both names resolve to the same
+ * canonical string.
  */
 function expand(name: string): string {
-  return normalize(name)
-    .replace(/\buconn\b/g, 'connecticut')
-    .replace(/\bunc\b/g, 'north carolina')
-    .replace(/^st\b/, 'saint')   // "st" as first word → saint
-    .replace(/\bst\b/g, 'state') // "st" elsewhere → state (Michigan St, etc.)
+  let s = normalize(name)
+
+  // ── 1. Multi-word phrase aliases ────────────────────────────────────────
+  s = s.replace(/\bsouthern illinois edwardsville\b/g, 'siu edwardsville')
+  s = s.replace(/\bvirginia commonwealth\b/g, 'vcu')
+  s = s.replace(/\bbrigham young\b/g, 'byu')
+  s = s.replace(/\bsouthern methodist\b/g, 'smu')
+  s = s.replace(/\bcentral florida\b/g, 'ucf')
+  s = s.replace(/\bnorthern iowa\b/g, 'uni')
+  s = s.replace(/\blong island\b/g, 'liu')           // Long Island University → LIU
+  s = s.replace(/\bnebraska omaha\b/g, 'omaha')      // Nebraska Omaha → Omaha
+  s = s.replace(/\bmiami fl\b/g, 'miami')            // strips (FL) qualifier
+
+  // ── 2. Single-word abbreviations ────────────────────────────────────────
+  s = s.replace(/\buconn\b/g, 'connecticut')
+  s = s.replace(/\buncw\b/g, 'north carolina wilmington') // before \bunc\b
+  s = s.replace(/\bunc\b/g, 'north carolina')
+  s = s.replace(/\bpenn\b/g, 'pennsylvania')         // Penn Quakers → Pennsylvania
+
+  // ── 3. "st" context rule ────────────────────────────────────────────────
+  s = s.replace(/^st\b/, 'saint')   // leading "st" → saint  (St. John's, St. Mary's)
+  s = s.replace(/\bst\b/g, 'state') // elsewhere  → state   (Michigan St, Iowa St)
+
+  return s
 }
 
 /**
