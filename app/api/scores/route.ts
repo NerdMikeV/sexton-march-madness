@@ -54,6 +54,7 @@ function expand(name: string): string {
   s = s.replace(/\blong island\b/g, 'liu')           // Long Island University → LIU
   s = s.replace(/\bnebraska omaha\b/g, 'omaha')      // Nebraska Omaha → Omaha
   s = s.replace(/\bmiami fl\b/g, 'miami')            // strips (FL) qualifier
+  s = s.replace(/\bprairie view a m\b/g, 'prairie view') // A&M normalizes to "a m"
 
   // ── 2. Single-word abbreviations ────────────────────────────────────────
   s = s.replace(/\buconn\b/g, 'connecticut')
@@ -85,7 +86,11 @@ function matchesDbName(oddsExpanded: string, dbName: string): boolean {
   const parts = dbName.split('/')
   return parts.some(part => {
     const e = expand(part.trim())
-    return oddsExpanded === e || oddsExpanded.startsWith(e + ' ')
+    // Check both directions: Odds API name may be longer (has mascot) OR
+    // shorter (uses abbreviation) than the DB name after expansion.
+    return oddsExpanded === e
+      || oddsExpanded.startsWith(e + ' ')
+      || e.startsWith(oddsExpanded + ' ')
   })
 }
 
