@@ -620,12 +620,9 @@ export default function AdminPage() {
                                 <span className="font-medium text-sm">{entryDisplayNames.get(entry.id) ?? entry.participant_name}</span>
                                 <button
                                   onClick={() => { setEditingEntryId(entry.id); setEditingName(entry.participant_name) }}
-                                  className="text-white/20 hover:text-white/60 transition-colors flex-shrink-0"
-                                  title="Edit name"
+                                  className="text-xs text-amber-400 hover:text-amber-300 border border-amber-500/40 hover:border-amber-400 px-2 py-0.5 rounded transition-colors flex-shrink-0"
                                 >
-                                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
-                                  </svg>
+                                  Edit
                                 </button>
                               </>
                             )}
