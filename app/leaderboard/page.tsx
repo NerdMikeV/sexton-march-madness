@@ -191,12 +191,9 @@ export default function LeaderboardPage() {
         <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-8">
           <div>
             <h1 className="font-bebas text-5xl tracking-widest text-amber-400">LEADERBOARD</h1>
-            <p className="text-white/40 text-sm mt-1">
-              {entryCount} {entryCount === 1 ? 'entry' : 'entries'}
-              {lastUpdated && (
-                <span> · Updated {lastUpdated.toLocaleTimeString()}</span>
-              )}
-            </p>
+            {lastUpdated && (
+              <p className="text-white/40 text-sm mt-1">Updated {lastUpdated.toLocaleTimeString()}</p>
+            )}
           </div>
           <div className="flex items-center gap-2">
             <div className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />
