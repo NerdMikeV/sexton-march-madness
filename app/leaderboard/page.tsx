@@ -192,7 +192,7 @@ export default function LeaderboardPage() {
           <div>
             <h1 className="font-bebas text-5xl tracking-widest text-amber-400">LEADERBOARD</h1>
             <p className="text-white/40 text-sm mt-1">
-              {entries.length} {entries.length === 1 ? 'entry' : 'entries'}
+              {entryCount} {entryCount === 1 ? 'entry' : 'entries'}
               {lastUpdated && (
                 <span> · Updated {lastUpdated.toLocaleTimeString()}</span>
               )}
