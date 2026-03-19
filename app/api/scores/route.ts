@@ -57,6 +57,7 @@ function expand(name: string): string {
   s = s.replace(/\blong island\b/g, 'liu')           // Long Island University → LIU
   s = s.replace(/\bnebraska omaha\b/g, 'omaha')      // Nebraska Omaha → Omaha
   s = s.replace(/\bmiami fl\b/g, 'miami')            // strips (FL) qualifier
+  s = s.replace(/\bmiami oh\b/g, 'miamioh')          // Miami (OH) → distinct token, won't prefix-match "miami"
   s = s.replace(/\bprairie view a m\b/g, 'prairie view') // A&M normalizes to "a m"
 
   // ── 2. Single-word abbreviations ────────────────────────────────────────
@@ -121,13 +122,16 @@ function findTeam(oddsName: string, teams: DBTeam[]): DBTeam | undefined {
 /**
  * Map a game's commence_time to a contest round number.
  * Returns 0 for First Four (play-in), 1–6 for scored rounds, null if unknown.
- * Dates are compared in UTC; tournament games tip off in the afternoon ET
- * (UTC-4 during DST) so the UTC date matches the calendar date.
+ *
+ * Dates are checked in Eastern Time (UTC-4 after DST on March 8) so that a
+ * game tipping off at 9 pm ET on March 18 is not misread as March 19 in UTC.
  */
 function getRound(commenceTime: string): number | null {
   const d = new Date(commenceTime)
-  const month = d.getUTCMonth() + 1 // 1-indexed
-  const day = d.getUTCDate()
+  // Convert to ET (EDT = UTC-4 throughout the tournament after March 8 DST)
+  const et = new Date(d.getTime() - 4 * 60 * 60 * 1000)
+  const month = et.getUTCMonth() + 1 // 1-indexed
+  const day = et.getUTCDate()
 
   if (month === 3 && (day === 17 || day === 18)) return 0 // First Four (play-in)
   if (month === 3 && (day === 19 || day === 20)) return 1 // Round of 64
