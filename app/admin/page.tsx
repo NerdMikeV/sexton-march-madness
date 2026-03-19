@@ -39,6 +39,8 @@ export default function AdminPage() {
   // Entries state
   const [entries, setEntries] = useState<EntryWithPicks[]>([])
   const [expandedEntry, setExpandedEntry] = useState<string | null>(null)
+  const [editingEntryId, setEditingEntryId] = useState<string | null>(null)
+  const [editingName, setEditingName] = useState('')
 
   // Settings state
   const [deadline, setDeadline] = useState('')
@@ -235,6 +237,18 @@ export default function AdminPage() {
   async function deleteEntry(id: string) {
     if (!confirm('Delete this entry?')) return
     await fetch(`/api/admin/entries/${id}`, { method: 'DELETE' })
+    fetchEntries()
+  }
+
+  async function renameEntry(id: string, name: string) {
+    const trimmed = name.trim()
+    if (!trimmed) return
+    await fetch(`/api/admin/entries/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ participant_name: trimmed }),
+    })
+    setEditingEntryId(null)
     fetchEntries()
   }
 
@@ -585,8 +599,36 @@ export default function AdminPage() {
                     <div key={entry.id}>
                       <div className="flex items-center gap-4 px-6 py-4">
                         <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2">
-                            <span className="font-medium text-sm">{entryDisplayNames.get(entry.id) ?? entry.participant_name}</span>
+                          <div className="flex items-center gap-2 flex-wrap">
+                            {editingEntryId === entry.id ? (
+                              <form
+                                onSubmit={e => { e.preventDefault(); renameEntry(entry.id, editingName) }}
+                                className="flex items-center gap-1.5"
+                              >
+                                <input
+                                  autoFocus
+                                  value={editingName}
+                                  onChange={e => setEditingName(e.target.value)}
+                                  onKeyDown={e => { if (e.key === 'Escape') setEditingEntryId(null) }}
+                                  className="bg-white/10 border border-amber-500/50 rounded px-2 py-0.5 text-sm text-white focus:outline-none focus:border-amber-400 w-48"
+                                />
+                                <button type="submit" className="text-xs text-amber-400 hover:text-amber-300 font-medium">Save</button>
+                                <button type="button" onClick={() => setEditingEntryId(null)} className="text-xs text-white/30 hover:text-white/60">Cancel</button>
+                              </form>
+                            ) : (
+                              <>
+                                <span className="font-medium text-sm">{entryDisplayNames.get(entry.id) ?? entry.participant_name}</span>
+                                <button
+                                  onClick={() => { setEditingEntryId(entry.id); setEditingName(entry.participant_name) }}
+                                  className="text-white/20 hover:text-white/60 transition-colors flex-shrink-0"
+                                  title="Edit name"
+                                >
+                                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                                  </svg>
+                                </button>
+                              </>
+                            )}
                             <span className={`text-xs px-2 py-0.5 rounded-full ${entry.paid ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}`}>
                               {entry.paid ? 'PAID' : 'UNPAID'}
                             </span>
