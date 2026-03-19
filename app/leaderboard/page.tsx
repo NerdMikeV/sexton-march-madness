@@ -68,28 +68,31 @@ export default function LeaderboardPage() {
       setEntries(data)
       setLastUpdated(new Date())
 
-      // Batch-fetch all picks with team elimination status
+      // Batch-fetch ALL picks in one query (no .in() filter — avoids URL
+      // length limits with 150+ entry IDs).  157 entries × 8 picks = ~1256
+      // rows; limit(2000) keeps us well clear of the default 1000-row cap.
       if (data.length > 0) {
         const supabase = createClient()
         const { data: allPicks } = await supabase
           .from('entry_picks')
           .select('entry_id, team:teams(name, seed, is_eliminated)')
-          .in('entry_id', data.map(e => e.entry_id))
+          .limit(2000)
 
-        if (allPicks) {
-          const map: Record<string, RemainingTeam[]> = {}
-          for (const pick of allPicks) {
-            const team = Array.isArray(pick.team) ? pick.team[0] : pick.team
-            if (!team || team.is_eliminated) continue
-            if (!map[pick.entry_id]) map[pick.entry_id] = []
-            map[pick.entry_id].push({ name: team.name, seed: team.seed })
-          }
-          // Sort each entry's remaining teams by seed
-          for (const id of Object.keys(map)) {
-            map[id].sort((a, b) => a.seed - b.seed)
-          }
-          setRemainingByEntry(map)
+        // Pre-seed every entry with an empty array so entries whose teams are
+        // all eliminated show "0 remaining" instead of "Loading…"
+        const map: Record<string, RemainingTeam[]> = {}
+        for (const e of data) map[e.entry_id] = []
+
+        for (const pick of allPicks ?? []) {
+          const team = Array.isArray(pick.team) ? pick.team[0] : pick.team
+          if (!team || team.is_eliminated) continue
+          if (!map[pick.entry_id]) map[pick.entry_id] = []
+          map[pick.entry_id].push({ name: team.name, seed: team.seed })
         }
+        for (const id of Object.keys(map)) {
+          map[id].sort((a, b) => a.seed - b.seed)
+        }
+        setRemainingByEntry(map)
       }
     }
   }, [])
