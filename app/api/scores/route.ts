@@ -74,6 +74,17 @@ function expand(name: string): string {
 }
 
 /**
+ * Words that change a school's identity when they follow the school name.
+ * "Iowa" ≠ "Iowa State"; "Georgia" ≠ "Georgia Tech", etc.
+ * If the DB name prefix-matches the API name but the next word is one of
+ * these, it's a different school — reject the match.
+ */
+const TEAM_QUALIFIER_WORDS = new Set([
+  'state', 'tech', 'southern', 'northern', 'eastern', 'western', 'central',
+  'a', // catches "A&M" which normalizes to "a m"
+])
+
+/**
  * Check whether the Odds API name (which includes the mascot, e.g.
  * "Duke Blue Devils") matches a single DB name (e.g. "Duke").
  *
@@ -81,6 +92,10 @@ function expand(name: string): string {
  * This strips mascots implicitly and avoids false positives like
  * "South Alabama Jaguars" matching DB "Alabama" (because
  * "south alabama jaguars" does NOT start with "alabama").
+ *
+ * Word-boundary guard: after the prefix match, the next word in the API name
+ * must NOT be a team-qualifying word (state, tech, etc.) — otherwise it's a
+ * different school (e.g. "Iowa" must not match "Iowa State Cyclones").
  *
  * For play-in entries stored as "TeamA/TeamB" in the DB, each half is
  * checked separately.
@@ -90,11 +105,24 @@ function matchesDbName(oddsExpanded: string, dbName: string): boolean {
   const parts = dbName.split('/')
   return parts.some(part => {
     const e = expand(part.trim())
+    // Exact match — always good
+    if (oddsExpanded === e) return true
     // Check both directions: Odds API name may be longer (has mascot) OR
     // shorter (uses abbreviation) than the DB name after expansion.
-    return oddsExpanded === e
-      || oddsExpanded.startsWith(e + ' ')
-      || e.startsWith(oddsExpanded + ' ')
+    if (oddsExpanded.startsWith(e + ' ')) {
+      // Word-boundary guard: reject if the next word is a team qualifier
+      const remainder = oddsExpanded.slice(e.length + 1)
+      const nextWord = remainder.split(' ')[0]
+      if (TEAM_QUALIFIER_WORDS.has(nextWord)) return false
+      return true
+    }
+    if (e.startsWith(oddsExpanded + ' ')) {
+      const remainder = e.slice(oddsExpanded.length + 1)
+      const nextWord = remainder.split(' ')[0]
+      if (TEAM_QUALIFIER_WORDS.has(nextWord)) return false
+      return true
+    }
+    return false
   })
 }
 
@@ -111,10 +139,17 @@ function isTournamentGame(game: OddsGame, dbNames: string[]): boolean {
   )
 }
 
-/** Find the DB team record whose name matches a given Odds API team name. */
+/** Find the DB team record whose name matches a given Odds API team name.
+ *  When multiple teams match (shouldn't happen after word-boundary guard,
+ *  but as a safety net), prefer the longest expanded name — the most specific. */
 function findTeam(oddsName: string, teams: DBTeam[]): DBTeam | undefined {
   const e1 = expand(oddsName)
-  return teams.find(t => matchesDbName(e1, t.name))
+  const matches = teams.filter(t => matchesDbName(e1, t.name))
+  if (matches.length <= 1) return matches[0]
+  // Most specific match = longest expanded DB name
+  return matches.reduce((best, t) =>
+    expand(t.name).length > expand(best.name).length ? t : best
+  )
 }
 
 // ── Round determination ───────────────────────────────────────────────────────
