@@ -3,6 +3,7 @@ import { Bebas_Neue, Inter } from 'next/font/google'
 import './globals.css'
 import Nav from '@/components/Nav'
 import { createClient } from '@/lib/supabase/server'
+import { Analytics } from '@vercel/analytics/next'
 
 const bebasNeue = Bebas_Neue({
   weight: '400',
@@ -44,6 +45,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body className="antialiased min-h-screen bg-[#0a0e17] text-white font-sans">
         <Nav />
         <main>{children}</main>
+        <Analytics />
       </body>
     </html>
   )
